@@ -7,22 +7,39 @@ import sys
 import threading
 from copy import deepcopy
 
+import urllib2
+
 def forward(data):
-	headers = parseHeader(deepcopy(data[:data.find('\r\n\r\n')]))
-	print headers
-	if "Content-Length" in headers:
-		body = data[data.find('\r\n\r\n')+4:data.find('\r\n\r\n')+4+int(headers['Content-Length'])]
+	request,options = parseHeader(deepcopy(data[:data.find('\r\n\r\n')]))
+
+	if "Content-Length" in options:
+		body = data[data.find('\r\n\r\n')+4:data.find('\r\n\r\n')+4+int(options['Content-Length'])]
 	else:
 		body = ""
 
+	opener = urllib2.build_opener()
+	opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+	response = opener.open('http://www.example.com/')
+	html = response.read()
+	#opener = urllib2.build_opener()
+	#opener.addheaders(options)
+	#html = opener.open(request)
+
+	return html
+
 def parseHeader(data):
 	fields = data.split('\r\n')
-	options = {"request":fields[0]}
+	request = {"request":fields[0][fields[0].find('/'):fields[0].find('HTTP')-1]}
+	options = []
 	for op in fields[1:]:
 		key, field = op[:op.find(':')], op[op.find(':')+2:]
 		if key != '' and field != '':
-			options[key] = field
-	return options
+			if key == "Connection":
+				options.append(("Connection","close"))
+			elif key != "Proxy-Connection":
+				options.append((key,field))
+
+	return request,options
 
 def listen(server):
 	inputs = [server]
@@ -40,9 +57,11 @@ def listen(server):
 			else:
 				# recv data up to 1024 bytes
 				data = s.recv(4096)
-				t = threading.Thread(target=forward, args=(data,))
-				t.daemon = True
-				t.start()
+				#t = threading.Thread(target=forward, args=(data,))
+				#t.daemon = True
+				#t.start()
+				html = forward(data)
+				s.send(html)
 
 				# remove inputs so next select call does not read it again
 				inputs.remove(s)
