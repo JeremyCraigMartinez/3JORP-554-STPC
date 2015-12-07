@@ -2,6 +2,7 @@ import socket
 import urlparse
 import sys
 import urllib2
+import httplib
 
 def do_GET(host, request):
 	# socket approach not working
@@ -21,10 +22,13 @@ def do_GET(host, request):
 
 	finally:
 		sock.close()'''
-	print host
-	response = urllib2.urlopen(host)
-	html = response.read()
-	return html
+
+	try:
+		response = urllib2.urlopen(host)
+		html = response.read()
+		return html
+	except:
+		return ""
 
 def do_POST(host, request, data):
 	print 'do_POST'

@@ -22,7 +22,6 @@ def client(host, request, data, protocol):
 		raise ValueError('wrong protocol')
 
 def forward(data):
-	print data
 	request,options = parseHeader(deepcopy(data[:data.find('\r\n\r\n')]))
 	if request['url'] == 'favicon.ico':
 		return

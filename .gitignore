@@ -1,1 +1,4 @@
 ps
+*.pyc
+exampleHeader.json
+another
