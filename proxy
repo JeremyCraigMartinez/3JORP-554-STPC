@@ -1,0 +1,66 @@
+#!/usr/bin/python
+
+import socket
+import select
+import time
+import sys
+import threading
+
+def forward(data):
+	print 'new connection\n'
+	print data
+	print '======================'
+
+def parseHeader(data):
+	fields = data.split('\n')
+	options = {"request":fields[0]}
+	for op in fields[1:]:
+		options[op]
+
+def listen(server):
+	inputs = [server]
+	outputs = []
+	queue = []
+	while True:
+		readable, writable, exceptional = select.select(inputs, outputs, [])
+
+		for s in readable:
+			if s is server:
+				connection, client_address = s.accept()
+				connection.setblocking(0)
+				inputs.append(connection)
+
+			else:
+				# recv data up to 1024 bytes
+				data = s.recv(4096)
+				t = threading.Thread(target=forward, args=(data,))
+				t.daemon = True
+				t.start()
+
+				# remove inputs so next select call does not read it again
+				inputs.remove(s)
+				# close socket that select intercepted and that we were reading from
+				s.close()
+
+# set socket for the server to listen on
+def set_sockets(host, port):
+	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+	server.setblocking(0)
+
+	server_address = (host, port)
+	print >>sys.stderr, 'starting up on %s port %s' % server_address
+	server.bind(server_address)
+
+	server.listen(5)
+
+	return server
+
+if __name__ == '__main__':
+	try:
+		server = set_sockets('localhost', 8080)
+
+		listen(server)
+	except KeyboardInterrupt:
+		print('ctrl-c exit')
+		sys.exit(0)
