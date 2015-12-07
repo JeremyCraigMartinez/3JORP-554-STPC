@@ -7,29 +7,48 @@ import sys
 import threading
 from copy import deepcopy
 
+from protocols import do_GET, do_POST, do_HEAD
+
 import urllib2
 
-def forward(data):
-	request,options = parseHeader(deepcopy(data[:data.find('\r\n\r\n')]))
+def client(host, request, data, protocol):
+	if protocol == 'GET':
+		return do_GET(host, request)
+	elif protocol == 'POST':
+		return do_POST(host, request, data)
+	elif protocol == 'HEAD':
+		return do_HEAD(host, request)
+	else:
+		raise ValueError('wrong protocol')
 
+def forward(data):
+	print data
+	request,options = parseHeader(deepcopy(data[:data.find('\r\n\r\n')]))
+	if request['url'] == 'favicon.ico':
+		return
+
+	body = ""
 	if "Content-Length" in options:
 		body = data[data.find('\r\n\r\n')+4:data.find('\r\n\r\n')+4+int(options['Content-Length'])]
-	else:
-		body = ""
 
-	opener = urllib2.build_opener()
-	opener.addheaders = [('User-agent', 'Mozilla/5.0')]
-	response = opener.open('http://www.example.com/')
-	html = response.read()
-	#opener = urllib2.build_opener()
-	#opener.addheaders(options)
-	#html = opener.open(request)
+	if request['url'] == "":
+		return "<html><body><h1>Enter a URL</h1><h3>example: localhost:8080/http://www.cnn.com/</h3></body></html>"
+	
+	try:
+		return client(request['url'],request['request'],body,request['protocol'])
+	except ValueError as e:
+		print e
+		return "<html><body><p>Error: " + str(e) + "</p></body></html>"
 
-	return html
+	return "<html><body><h1>Good job: " + request['url'] + "</h1></body></html>"
 
 def parseHeader(data):
 	fields = data.split('\r\n')
-	request = {"request":fields[0][fields[0].find('/'):fields[0].find('HTTP')-1]}
+	request = {
+		"request": fields[0],
+		"url": fields[0][fields[0].find(' ')+1:fields[0].find('HTTP/1.1')],
+		"protocol": fields[0][:fields[0].find(' ')]
+	}
 	options = []
 	for op in fields[1:]:
 		key, field = op[:op.find(':')], op[op.find(':')+2:]
@@ -61,7 +80,9 @@ def listen(server):
 				#t.daemon = True
 				#t.start()
 				html = forward(data)
-				s.send(html)
+				
+				if html:
+					s.send(html)
 
 				# remove inputs so next select call does not read it again
 				inputs.remove(s)
