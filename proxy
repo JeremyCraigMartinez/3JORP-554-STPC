@@ -5,17 +5,24 @@ import select
 import time
 import sys
 import threading
+from copy import deepcopy
 
 def forward(data):
-	print 'new connection\n'
-	print data
-	print '======================'
+	headers = parseHeader(deepcopy(data[:data.find('\r\n\r\n')]))
+	print headers
+	if "Content-Length" in headers:
+		body = data[data.find('\r\n\r\n')+4:data.find('\r\n\r\n')+4+int(headers['Content-Length'])]
+	else:
+		body = ""
 
 def parseHeader(data):
-	fields = data.split('\n')
+	fields = data.split('\r\n')
 	options = {"request":fields[0]}
 	for op in fields[1:]:
-		options[op]
+		key, field = op[:op.find(':')], op[op.find(':')+2:]
+		if key != '' and field != '':
+			options[key] = field
+	return options
 
 def listen(server):
 	inputs = [server]
