@@ -11,9 +11,9 @@ from protocols import do_GET, do_POST, do_HEAD
 
 import urllib2
 
-def client(host, request, data, protocol):
+def client(host, request, data, protocol, www):
 	if protocol == 'GET':
-		return do_GET(host, request)
+		return do_GET(host, request, www)
 	elif protocol == 'POST':
 		return do_POST(host, request, data)
 	elif protocol == 'HEAD':
@@ -34,7 +34,7 @@ def forward(data):
 		return "<html><body><h1>Enter a URL</h1><h3>example: localhost:8080/http://www.cnn.com/</h3></body></html>"
 	
 	try:
-		return client(request['url'],request['request'],body,request['protocol'])
+		return client(request['url'],request['request'],body,request['protocol'],request['www'])
 	except ValueError as e:
 		print e
 		return "<html><body><p>Error: " + str(e) + "</p></body></html>"
@@ -43,9 +43,20 @@ def forward(data):
 
 def parseHeader(data):
 	fields = data.split('\r\n')
+
+	url = fields[0][fields[0].find(' ')+1:fields[0].find('HTTP/1.1')-1]
+	url = url[url.find('http')+7:]
+	www = ""
+	if url.startswith('www.'):
+		www = "www."
+		url = url[4:]
+	if url.endswith('/'):
+		url = url[:len(url)-1]
+
 	request = {
 		"request": fields[0],
-		"url": fields[0][fields[0].find(' ')+1:fields[0].find('HTTP/1.1')],
+		"url": url,
+		"www": www,
 		"protocol": fields[0][:fields[0].find(' ')]
 	}
 	options = []
@@ -74,7 +85,7 @@ def listen(server):
 
 			else:
 				# recv data up to 1024 bytes
-				data = s.recv(4096)
+				data = s.recv(10000)
 				#t = threading.Thread(target=forward, args=(data,))
 				#t.daemon = True
 				#t.start()
