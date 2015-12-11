@@ -2,7 +2,7 @@
 
 1. run proxy on command line: `python proxy`
 2. open browser
-3. search browser leading with `localhost:8080`. (e.g. `http://localhost:8080/www.cnn.com`)
+3. set proxy settings to localhost:8080
 
 #How it works
 - creates socket for proxy server

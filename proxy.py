@@ -7,73 +7,60 @@ import sys
 import threading
 from copy import deepcopy
 
-from protocols import do_GET, do_POST, do_HEAD
+from protocols import do_CALL
 
 import urllib2
 
-def client(host, request, data, protocol, www):
-	if protocol == 'GET':
-		return do_GET(host, request, www)
-	elif protocol == 'POST':
-		return do_POST(host, request, data)
-	elif protocol == 'HEAD':
-		return do_HEAD(host, request)
-	else:
-		raise ValueError('wrong protocol')
+def client(host, data):
+	return do_CALL(host, data)
 
 def forward(data):
-	request,options = parseHeader(deepcopy(data[:data.find('\r\n\r\n')]))
-	if request['url'] == 'favicon.ico':
+	#parse headers into the url, headers options (in tuple)
+	url,options = parseHeader(deepcopy(data[:data.find('\r\n\r\n')]))
+	if url == 'favicon.ico':
 		return
 
+	#find body and set individual variable for data
 	body = ""
 	if "Content-Length" in options:
 		body = data[data.find('\r\n\r\n')+4:data.find('\r\n\r\n')+4+int(options['Content-Length'])]
 
-	if request['url'] == "":
+	if url == "":
 		return "<html><body><h1>Enter a URL</h1><h3>example: localhost:8080/http://www.cnn.com/</h3></body></html>"
 	
 	try:
-		return client(request['url'],request['request'],body,request['protocol'],request['www'])
+		return client(url,data)
 	except ValueError as e:
+		#poor url request
 		print e
 		return "<html><body><p>Error: " + str(e) + "</p></body></html>"
 
-	return "<html><body><h1>Good job: " + request['url'] + "</h1></body></html>"
+	return "<html><body><h1>Good job: " + url + "</h1></body></html>"
 
 def parseHeader(data):
+	#for easier parsing
 	fields = data.split('\r\n')
 
+	#parse out url
 	url = fields[0][fields[0].find(' ')+1:fields[0].find('HTTP/1.1')-1]
 	url = url[url.find('http')+7:]
-	www = ""
+	#if it starts with www, put in sep
 	if url.startswith('www.'):
-		www = "www."
 		url = url[4:]
 	if url.endswith('/'):
 		url = url[:len(url)-1]
-
-	request = {
-		"request": fields[0],
-		"url": url,
-		"www": www,
-		"protocol": fields[0][:fields[0].find(' ')]
-	}
+		
 	options = []
 	for op in fields[1:]:
 		key, field = op[:op.find(':')], op[op.find(':')+2:]
 		if key != '' and field != '':
-			if key == "Connection":
-				options.append(("Connection","close"))
-			elif key != "Proxy-Connection":
-				options.append((key,field))
+			options.append((key,field))
 
-	return request,options
+	return url,options
 
 def listen(server):
 	inputs = [server]
 	outputs = []
-	queue = []
 	while True:
 		readable, writable, exceptional = select.select(inputs, outputs, [])
 
@@ -89,6 +76,7 @@ def listen(server):
 				#t = threading.Thread(target=forward, args=(data,))
 				#t.daemon = True
 				#t.start()
+
 				html = forward(data)
 				
 				if html:
@@ -113,11 +101,15 @@ def set_sockets(host, port):
 
 	return server
 
+#when run from command line
 if __name__ == '__main__':
 	try:
 		server = set_sockets('localhost', 8080)
 
+		#main program
 		listen(server)
+
+	#catch the end of the program and spit this out	
 	except KeyboardInterrupt:
 		print('ctrl-c exit')
 		sys.exit(0)
