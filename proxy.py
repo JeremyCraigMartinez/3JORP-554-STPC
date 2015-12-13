@@ -9,7 +9,32 @@ from copy import deepcopy
 
 from protocols import do_CALL
 
-import urllib2
+#import urllib2
+
+DEBUG = 0
+
+class myThread (threading.Thread):
+    def __init__(self, s):
+        threading.Thread.__init__(self)
+        self.s = s
+    def run(self):
+        #print "Starting "		
+        if DEBUG: print "myThread: Running"             
+        process_data(self.s)
+        if DEBUG: print "myThread: complete"             
+
+def process_data(s):     
+	# recv data up to 10240 bytes
+    if DEBUG: print "process_data: Processing Data\n"            
+    data = s.recv(10240)
+    if DEBUG: print "process_data: inbound data -- ",data
+    html = forward(data)
+    if html:
+        if DEBUG: print "process_data: forward data -- ", html
+        s.send(html)
+    # close socket that select intercepted and that we were reading from
+    s.close()
+    if DEBUG: print "process_data: complete", html
 
 def client(host, data):
 	return do_CALL(host, data)
@@ -30,6 +55,7 @@ def forward(data):
 	
 	try:
 		return client(url,data)
+        
 	except ValueError as e:
 		#poor url request
 		print e
@@ -61,40 +87,24 @@ def parseHeader(data):
 def listen(server):
 	inputs = [server]
 	outputs = []
-	while True:
-		readable, writable, exceptional = select.select(inputs, outputs, [])
-
-		for s in readable:
-			if s is server:
-				connection, client_address = s.accept()
-				connection.setblocking(0)
-				inputs.append(connection)
-
-			else:
-				# recv data up to 1024 bytes
-				data = s.recv(10000)
-				#t = threading.Thread(target=forward, args=(data,))
-				#t.daemon = True
-				#t.start()
-
-				html = forward(data)
-				
-				if html:
-					s.send(html)
-
-				# remove inputs so next select call does not read it again
-				inputs.remove(s)
-				# close socket that select intercepted and that we were reading from
-				s.close()
+	if DEBUG: print "listen"
+ 	while True:
+		
+		connection, client_address = server.accept()
+		if DEBUG: print "accept", connection
+		connection.setblocking(1)
+		inputs.append(connection)
+		thread = myThread(connection)
+		thread.start()
 
 # set socket for the server to listen on
 def set_sockets(host, port):
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-	server.setblocking(0)
+	server.setblocking(1)
 
 	server_address = (host, port)
-	print >>sys.stderr, 'starting up on %s port %s' % server_address
+	if DEBUG: print >>sys.stderr, 'starting up on %s port %s' % server_address
 	server.bind(server_address)
 
 	server.listen(5)
